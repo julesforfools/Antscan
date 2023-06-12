@@ -57,7 +57,7 @@ def mask2mask(mask_path):
     else:
         raise ValueError("Expected exactly two unique values, but found otherwise. The input does not seem to be a mask")
 
-def downsample(image, factor):
+def downsample(image, fac=2):
     
     '''
     This function converts an image to a smaller version by resizing
@@ -65,7 +65,6 @@ def downsample(image, factor):
     '''    
     euler3d = sitk.Euler3DTransform()
 
-    fac = 2
     output_size = tuple(int((1/fac) * elem) for elem in image.GetSize()) # Use a rounded result for each dimension of the image
     output_spacing = tuple(fac * elem for elem in image.GetSpacing()) # Keep isometric voxel size
     
@@ -88,11 +87,19 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     If there is any kind of info like voxel-size attached to the files, it will probably fail.
     The function requires a lot of memory and was written with 3D-Tiff files in mind.
     The function returns nothing but an SimpleITK transform object
+    
+    this function uses downsample
+    
+    this function was purely made for antscan data
     '''
-
+    
+    ### Choose downsampling factor to also apply to final transform
+    factor = 3
+    
     ### Downsample image to not crash the memory of the computer
-
-
+    fixed_image = downsample(fixed_image, factor)
+    moving_image = downsample(moving_image, factor)
+    
     ### Cast input images to 32bit for registration
     # Convert the images to floating-point format
     fixed_image = sitk.Cast(fixed_image, sitk.sitkFloat32)
@@ -101,11 +108,13 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     ### Setup of the initial transformation
     dimension = 3
     translation = sitk.TranslationTransform(dimension)
-    translation.SetParameters((0.0, 0.0, float(initial_z)))
+    translation.SetParameters((0.0, 0.0, float(initial_z/factor))) # Consider downsampling factor here 
     print("Initial Parameters: " + str(translation.GetOffset()))
 
-    ### Three-Step registration
-    ## Round 1: Exhaustive Registration on 8-times downsampling
+    ###############################
+    ### Three-Step registration ###
+    ###############################
+    ### Round 1: Exhaustive Registration on 8-times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
 
     # Similarity metric settings
@@ -134,10 +143,10 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after first step: " + str(translation.GetOffset()))
+    print("Parameters after first step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
 
 
-    ## Round 2: Exhaustive Registration on 4-times downsampling
+    ### Round 2: Exhaustive Registration on 4-times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
 
     # Similarity metric settings
@@ -166,10 +175,10 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after first step: " + str(translation.GetOffset()))
+    print("Parameters after first step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
 
 
-    ## Round 3: Final step with Gradient Descent optimizer on 4,2,1 times downsampling
+    ### Round 3: Final step with Gradient Descent optimizer on 4,2,1 times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
 
     # Similarity metric settings.
@@ -203,8 +212,14 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after first step: " + str(translation.GetOffset()))
+    print("Parameters after first step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
 
+    ### Scale Translation Up to apply to images
+    translation.SetParameters(
+        translation.GetOffset()[0]*factor,
+        translation.GetOffset()[1]*factor,
+        translation.GetOffset()[2]*factor,
+    )
 
     return(translation)
 
