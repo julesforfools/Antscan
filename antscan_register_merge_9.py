@@ -14,13 +14,13 @@ import numpy as np
 import os
 import scipy.ndimage
 
-fixed_image_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_z_00_resampled.tif"
-moving_image_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_z_01_resampled.tif"
+fixed_image_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_z_00.tif"
+moving_image_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_z_01.tif"
 #fixed_mask_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/14-32/43-8_z_00_resample.tif.mask.tif"
 #moving_mask_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/14-32/43-8_z_01_resample.tif.mask.tif"
 
 OUTPUT = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_merged.nii"
-z_shift = 825 # z_shift depends on magnification: 5x: -1650, 2x: -820; multiply these values for further z-stages
+z_shift = 1650 # z_shift depends on magnification: 5x: -1650, 2x: -820; multiply these values for further z-stages
 
 ############################################################################################
 ############################### Functions ##################################################
@@ -57,6 +57,29 @@ def mask2mask(mask_path):
     else:
         raise ValueError("Expected exactly two unique values, but found otherwise. The input does not seem to be a mask")
 
+def downsample(image, factor):
+    
+    '''
+    This function converts an image to a smaller version by resizing
+    the canvas of the image and using linear interpolation in SimpleITK
+    '''    
+    euler3d = sitk.Euler3DTransform()
+
+    fac = 2
+    output_size = tuple(int((1/fac) * elem) for elem in image.GetSize()) # Use a rounded result for each dimension of the image
+    output_spacing = tuple(fac * elem for elem in image.GetSpacing()) # Keep isometric voxel size
+    
+    image_resampled = sitk.Resample(
+        image,
+        output_size,
+        euler3d,
+        sitk.sitkLinear,
+        image.GetOrigin(),
+        output_spacing,
+        image.GetDirection()
+    )
+        
+    return(image_resampled)
 
 def three_step_registration(fixed_image, moving_image, initial_z):
 
@@ -66,6 +89,9 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     The function requires a lot of memory and was written with 3D-Tiff files in mind.
     The function returns nothing but an SimpleITK transform object
     '''
+
+    ### Downsample image to not crash the memory of the computer
+
 
     ### Cast input images to 32bit for registration
     # Convert the images to floating-point format
