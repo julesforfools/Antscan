@@ -11,7 +11,6 @@ Created on Thu May 18 15:19:07 2023
 
 import SimpleITK as sitk
 import numpy as np
-import os
 import scipy.ndimage
 
 fixed_image_path = "G:/3d_workdir/ant_sf/5_antscan_stitch_tests/16-43/16-43_z_00.tif"
@@ -58,16 +57,16 @@ def mask2mask(mask_path):
         raise ValueError("Expected exactly two unique values, but found otherwise. The input does not seem to be a mask")
 
 def downsample(image, fac=2):
-    
+
     '''
     This function converts an image to a smaller version by resizing
     the canvas of the image and using linear interpolation in SimpleITK
-    '''    
+    '''
     euler3d = sitk.Euler3DTransform()
 
     output_size = tuple(int((1/fac) * elem) for elem in image.GetSize()) # Use a rounded result for each dimension of the image
     output_spacing = tuple(fac * elem for elem in image.GetSpacing()) # Keep isometric voxel size
-    
+
     image_resampled = sitk.Resample(
         image,
         output_size,
@@ -77,29 +76,26 @@ def downsample(image, fac=2):
         output_spacing,
         image.GetDirection()
     )
-        
+
     return(image_resampled)
 
-def three_step_registration(fixed_image, moving_image, initial_z):
+def three_step_registration(fixed_image, moving_image, initial_z, factor=4):
 
     '''
     This function registers two CT-stacks where the approximate z-step (in pixels) is known.
     If there is any kind of info like voxel-size attached to the files, it will probably fail.
     The function requires a lot of memory and was written with 3D-Tiff files in mind.
     The function returns nothing but an SimpleITK transform object
-    
+
     this function uses downsample
-    
+
     this function was purely made for antscan data
     '''
-    
-    ### Choose downsampling factor to also apply to final transform
-    factor = 3
-    
+
     ### Downsample image to not crash the memory of the computer
     fixed_image = downsample(fixed_image, factor)
     moving_image = downsample(moving_image, factor)
-    
+
     ### Cast input images to 32bit for registration
     # Convert the images to floating-point format
     fixed_image = sitk.Cast(fixed_image, sitk.sitkFloat32)
@@ -108,7 +104,7 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     ### Setup of the initial transformation
     dimension = 3
     translation = sitk.TranslationTransform(dimension)
-    translation.SetParameters((0.0, 0.0, float(initial_z/factor))) # Consider downsampling factor here 
+    translation.SetParameters((0.0, 0.0, float(initial_z/factor))) # Consider downsampling factor here
     print("Initial Parameters: " + str(translation.GetOffset()))
 
     ###############################
@@ -126,7 +122,7 @@ def three_step_registration(fixed_image, moving_image, initial_z):
 
     # Create the exhaustive optimizer
     registration_method.SetOptimizerAsExhaustive(
-        numberOfSteps=[3, 3, 5], stepLength=1 # Steps go in positive and negative direction
+        numberOfSteps=[3, 3, 10], stepLength=1 # Steps go in positive and negative direction
         )
 
     # Setup for the multi-resolution framework.
@@ -215,11 +211,11 @@ def three_step_registration(fixed_image, moving_image, initial_z):
     print("Parameters after first step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
 
     ### Scale Translation Up to apply to images
-    translation.SetParameters(
+    translation.SetParameters((
         translation.GetOffset()[0]*factor,
         translation.GetOffset()[1]*factor,
         translation.GetOffset()[2]*factor,
-    )
+    ))
 
     return(translation)
 
@@ -242,10 +238,15 @@ def merge_ct(fixed_image, moving_image, transform):
     transformed_moving_size = [int((size[i] - 1) * spacing[i] + abs(transform.GetOffset()[i])) + 1 for i in range(3)]
     print("Target Size", transformed_moving_size)
     transformed_moving_size.reverse() # Reverse for numpy array order of dimensions
-    canvas_np = np.zeros(transformed_moving_size)
-    canvas = sitk.GetImageFromArray(canvas_np)
-    print("Numpy Array Shape",canvas_np.shape)
+    canvas = np.zeros(transformed_moving_size, dtype=np.uint8)
+    canvas = sitk.GetImageFromArray(canvas)
+    #print("Numpy Array Shape",canvas_np.shape) # removed for memory
     print("ITK Canvas Size", canvas.GetSize())
+
+    # Delete the 0-15 slices of the upper image. The overlap is larger than that and they look bad usually!
+    fixed_image = sitk.GetArrayFromImage() # Convert the image to a numpy array
+    fixed_image[:10, :, :] = 0 # Set the first ten slices to black (zero)
+    fixed_image = sitk.GetImageFromArray(fixed_image) # Convert the modified numpy array back to SimpleITK image    
 
     # Resample the images statically onto the new merged size
     # The upper part first
@@ -273,18 +274,24 @@ def merge_ct(fixed_image, moving_image, transform):
     mask2 = np.where(sitk.GetArrayFromImage(moving_image) > 0, 1, 0) # non-absolute background are 1
 
     overlap = np.where(mask1+mask2 >= 2, 2, 1) # to avoid dividing by 0, we set the background and non overlap to 1, the overlap is set to two
+    mask1 = None # Deallocate memory
+    mask2 = None # Deallocate memory
+
+    # Add the two registered images together
+    average_image = sitk.Add(sitk.Cast(moving_image, sitk.sitkUInt16), sitk.Cast(fixed_image, sitk.sitkUInt16)) #Use 16 bit because the sum might clip at 255
+    fixed_image = None # Deallocate memory
+    moving_image = None # Deallocate memory
 
     overlap_image = sitk.GetImageFromArray(overlap)
+    overlap = None # Deallocate memory
     print(overlap_image.GetSize())
     print(overlap_image.GetPixelIDTypeAsString())
     overlap_image = sitk.Cast(overlap_image, sitk.sitkUInt16)
 
-    # Add the two registered images together
-    sum_image = sitk.Add(sitk.Cast(moving_image, sitk.sitkUInt16), sitk.Cast(fixed_image, sitk.sitkUInt16)) #Use 16 bit because the sum might clip at 255
-
     # Divide the sum by the count to obtain the average
     #average_image = sitk.Divide(overlap_image, sum_image)
-    average_image = sitk.Divide(sum_image, overlap_image)
+    average_image = sitk.Divide(average_image, overlap_image)
+    overlap_image = None # Deallocate memory
     average_image = sitk.Cast(average_image, sitk.sitkUInt8)
 
     print("New Size:", average_image.GetSize())
