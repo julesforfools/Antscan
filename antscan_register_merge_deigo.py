@@ -64,30 +64,7 @@ def mask2mask(mask_path):
     else:
         raise ValueError("Expected exactly two unique values, but found otherwise. The input does not seem to be a mask")
 
-def downsample(image, fac=2):
-
-    '''
-    This function converts an image to a smaller version by resizing
-    the canvas of the image and using linear interpolation in SimpleITK
-    '''
-    euler3d = sitk.Euler3DTransform()
-
-    output_size = tuple(int((1/fac) * elem) for elem in image.GetSize()) # Use a rounded result for each dimension of the image
-    output_spacing = tuple(fac * elem for elem in image.GetSpacing()) # Keep isometric voxel size
-
-    image_resampled = sitk.Resample(
-        image,
-        output_size,
-        euler3d,
-        sitk.sitkLinear,
-        image.GetOrigin(),
-        output_spacing,
-        image.GetDirection()
-    )
-
-    return(image_resampled)
-
-def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
+def four_step_registration(fixed_image, moving_image, initial_z):
 
     '''
     This function registers two CT-stacks where the approximate z-step (in pixels) is known.
@@ -100,10 +77,15 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     this function was purely made for antscan data
     '''
 
-    ### Downsample image to not crash the memory of the computer
-    if not factor==1:
-        fixed_image = downsample(fixed_image, factor)
-        moving_image = downsample(moving_image, factor)
+    ### Crop out parts of the images that are unnecessary for registration
+    n_crop_remain = int((moving_image.GetSize()[2]-(initial_z))*1.10) # Choose the number of slices to remain after cropping: overlap plus ten percent
+    print("Remaining Images after cropping:", n_crop_remain)
+    moving_image = moving_image[:, :, -n_crop_remain:] # Crop sitk image by slicing, note the minus to indicate that we want the last images for the upper part
+    print(moving_image.GetSize())
+    print("Upper Cropped Image Origin:", moving_image.GetOrigin())
+    fixed_image = fixed_image[:, :, :n_crop_remain] # Crop sitk image by slicing, note the minus to indicate that we want the last images for the upper part
+    print(fixed_image.GetSize())
+    print("Lower Cropped Image Origin:", fixed_image.GetOrigin())
 
     ### Cast input images to 32bit for registration
     # Convert the images to floating-point format
@@ -113,7 +95,7 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     ### Setup of the initial transformation
     dimension = 3
     translation = sitk.TranslationTransform(dimension)
-    translation.SetParameters((0.0, 0.0, float(initial_z/factor))) # Consider downsampling factor here
+    translation.SetParameters((0.0, 0.0, float(initial_z)))
     print("Initial Parameters: " + str(translation.GetOffset()))
 
     ###############################
@@ -148,7 +130,7 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after first step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
+    print("Parameters after first step: " + str(tuple(elem for elem in translation.GetOffset())))
 
 
     ### Round 2: Exhaustive Registration on 16-times downsampling with a smaller spectrum ###
@@ -180,7 +162,7 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after second step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
+    print("Parameters after second step: " + str(tuple(elem for elem in translation.GetOffset())))
 
     ### Round 3: Exhaustive Registration on 8-times downsampling finer ###
     registration_method = sitk.ImageRegistrationMethod()
@@ -211,7 +193,7 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after third step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
+    print("Parameters after third step: " + str(tuple(elem for elem in translation.GetOffset())))
 
     ### Round 4: Final step with Gradient Descent optimizer on 8,4,2 times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
@@ -247,19 +229,19 @@ def four_step_registration(fixed_image, moving_image, initial_z, factor=4):
     print(
         f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
         )
-    print("Parameters after last step: " + str(tuple(factor * elem for elem in translation.GetOffset())))
+    print("Parameters after last step: " + str(tuple(elem for elem in translation.GetOffset())))
 
     ### Scale Translation Up to apply to images
     translation.SetParameters((
-        translation.GetOffset()[0]*factor,
-        translation.GetOffset()[1]*factor,
-        translation.GetOffset()[2]*factor,
+        translation.GetOffset()[0],
+        translation.GetOffset()[1],
+        translation.GetOffset()[2],
     ))
 
     return(translation)
 
 
-def merge_ct(fixed_image, moving_image, transform):
+def merge_ct(lower_part, upper_part, transform):
 
     '''
     This function computes the resampling and merges two datasets into a new, stitched one.
@@ -269,12 +251,11 @@ def merge_ct(fixed_image, moving_image, transform):
 
     dimension = 3
 
-    # Get the size and spacing of the fixed image
-    size = fixed_image.GetSize()
-    spacing = fixed_image.GetSpacing()
+    # Get the size of the fixed image
+    size = lower_part.GetSize()
 
     # Compute the required size of the resampled image
-    transformed_moving_size = [int((size[i] - 1) * spacing[i] + abs(transform.GetOffset()[i])) + 1 for i in range(3)]
+    transformed_moving_size = [int((size[i] - 1) + abs(transform.GetOffset()[i])) + 1 for i in range(3)]
     print("Target Size", transformed_moving_size)
     transformed_moving_size.reverse() # Reverse for numpy array order of dimensions
     canvas = np.zeros(transformed_moving_size, dtype=np.uint8)
@@ -282,38 +263,40 @@ def merge_ct(fixed_image, moving_image, transform):
     #print("Numpy Array Shape",canvas_np.shape) # removed for memory
     print("ITK Canvas Size", canvas.GetSize())
 
-    # Delete the 0-15 slices of the upper image. The overlap is larger than that and they look bad usually!
-    fixed_image = sitk.GetArrayFromImage(fixed_image) # Convert the image to a numpy array
-    fixed_image[:10, :, :] = 0 # Set the first ten slices to black (zero)
-    fixed_image = sitk.GetImageFromArray(fixed_image) # Convert the modified numpy array back to SimpleITK image
+    n_overlap = upper_part.GetSize()[2]+lower_part.GetSize()[2]-canvas.GetSize()[2] #Calculate overlapping region
+    end_upper_part = (upper_part.GetSize()[2])-1 #Save the number of slices in the upper image as an index of the beginning of the overlap
+    print("\n The overlapping slices total ", n_overlap, "and the index for the last overlapping slice is", end_upper_part)
 
     # Resample the images statically onto the new merged size
     # The upper part first
-    moving_image = sitk.Resample(
-        moving_image,
+    upper_part = sitk.Resample(
+        upper_part,
         canvas,
         sitk.Transform(dimension, sitk.sitkIdentity),
         sitk.sitkLinear,
         0.0,
-        moving_image.GetPixelID(),
+        upper_part.GetPixelID(),
     )
     # Next the lower part
-    fixed_image = sitk.Resample(
-        fixed_image,
+    lower_part = sitk.Resample(
+        lower_part,
         canvas,
         transform.GetInverse(), # Apply inverse transform as the origin is the upper corner
         sitk.sitkLinear,
         0.0,
-        moving_image.GetPixelID(),
+        lower_part.GetPixelID(),
     )
 
-    ### Using the Overlapping areas to create an averaged image
-    # Create masks for pixels that are overlapping
-    mask1 = np.where(sitk.GetArrayFromImage(fixed_image) > 0, 1, 0).astype(np.uint8) # non-absolute background are 1
-    mask2 = np.where(sitk.GetArrayFromImage(moving_image) > 0, 1, 0).astype(np.uint8) # non-absolute background are 1
+    upper_part = sitk.GetArrayFromImage(upper_part)
+    lower_part = sitk.GetArrayFromImage(lower_part)
 
-    overlap = np.where(mask1+mask2 >= 2, 2, 1).astype(np.uint8) # to avoid dividing by 0, we set the background and non overlap to 1, the overlap is set to two
-    print("Overlap computed")
+    merged_image = upper_part+lower_part
+
+    # Compute weighted average as a gradient within the overlapping region
+    for slice in range(n_overlap):
+        merged_image[end_upper_part - slice] = slice/(n_overlap-1) * upper_part[end_upper_part - slice] + ((n_overlap-1)-slice)/(n_overlap-1) * lower_part[end_upper_part - slice]
+
+    merged_image = sitk.GetImageFromArray(merged_image)
 
     ### Print Memory usage
     # Get the current process ID
@@ -324,42 +307,11 @@ def merge_ct(fixed_image, moving_image, transform):
     print("Peak Memory usage in Merging step:", memory_usage, "GB")
     ###
 
-    mask1 = None # Deallocate memory
-    mask2 = None # Deallocate memory
-
-    # Add the two registered images together
-    merged_image = sitk.Add(sitk.Cast(moving_image, sitk.sitkUInt16), sitk.Cast(fixed_image, sitk.sitkUInt16)) #Use 16 bit because the sum might clip at 255
-    print("Images stitched")
-
-    ### Print Memory usage
-    # Get the current process ID
-    pid = psutil.Process()
-    # Get the memory usage in bytes
-    memory_usage = (pid.memory_info().rss) / (1024 * 1024 * 1024)
-    # Print the memory usage in gigabytes
-    print("2nd Peak Memory usage in Merging step:", memory_usage, "GB")
-    ###
-
-    fixed_image = None # Deallocate memory
-    moving_image = None # Deallocate memory
-
-    overlap_image = sitk.GetImageFromArray(overlap)
-    overlap = None # Deallocate memory
-    print("\nOverlap size: ", overlap_image.GetSize())
-    print("Overlap dtype: ", overlap_image.GetPixelIDTypeAsString())
-    overlap_image = sitk.Cast(overlap_image, sitk.sitkUInt16)
-
-    # Divide the sum by the count to obtain the average
-    merged_image = sitk.Divide(merged_image, overlap_image)
-    overlap_image = None # Deallocate memory
-    merged_image = sitk.Cast(merged_image, sitk.sitkUInt8)
-
     print("New Merged Image Size:", merged_image.GetSize())
     print("Pixel Type:", merged_image.GetPixelIDTypeAsString())
     print("Merging Images Done!\n")
 
-    return(merged_image, canvas)
-
+    return(merged_image)
 
 def mask2crop(average_image, canvas, transform, fixed_image_mask, moving_image_mask, dil_it=5):
 
@@ -429,20 +381,6 @@ def mask2crop(average_image, canvas, transform, fixed_image_mask, moving_image_m
 ############################################################################################
 ############################### Script #####################################################
 ############################################################################################
-
-#mask_00 = mask2mask(fixed_mask_path)
-#mask_01 = mask2mask(moving_mask_path)
-
-#print(mask_00.GetSize())
-#print(np.unique(sitk.GetArrayFromImage(mask_00)))
-#print(mask_00.GetPixelIDTypeAsString())
-
-#print("")
-
-#print(mask_01.GetSize())
-#print(np.unique(sitk.GetArrayFromImage(mask_01)))
-#print(mask_01.GetPixelIDTypeAsString())
-
 # Start a timer
 start_time = time.time()
 
@@ -475,11 +413,11 @@ print("Memory usage after loading the data:", memory_usage, "GB")
 ########################################################################
 
 # Registration with no downsampling!
-final_transform = four_step_registration(image_00, image_01, z_shift, 1)
+final_transform = four_step_registration(image_00, image_01, z_shift)
 
 print("\nFinal transform:", final_transform)
 
-average_image, canvas = merge_ct(image_00, image_01, final_transform)
+average_image = merge_ct(image_00, image_01, final_transform)
 
 ### Print Memory usage
 # Get the current process ID
