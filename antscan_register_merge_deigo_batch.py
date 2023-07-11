@@ -401,7 +401,7 @@ specimens = []
 for path in folders:
     subfolder = os.path.basename(path)  # Get the ultimate subfolder
     left_part = subfolder.split('_')[0]  # Extract the left part before the underscore
-    
+
     # Check if there is an existing list for the left part
     found = False
     for sublist in specimens:
@@ -409,7 +409,7 @@ for path in folders:
             sublist.append(path)
             found = True
             break
-    
+
     # If no existing list is found, create a new one
     if not found:
         specimens.append([path])
@@ -418,18 +418,18 @@ print("Total number of specimens:", len(specimens))
 
 # Register, merge, crop all specimens in folder
 for specimen in specimens:
-    
+
     spec_name = os.path.basename(specimen[0]).split('_')[0]
     print("Next specimen:", spec_name)
-    upper_image_path = specimen[-1]
+    upper_image_path = specimen[-1] #In antscan, the blend file comes after the abs file!
     upper_image = load_scan([entry.path for entry in os.scandir(upper_image_path) if entry.is_file()][-1])
     z_shift = 0 # initialize z-shift
-    
+
     while(len(specimen) > 1 and type(specimen) == list): # As long as there's images left to merge
         specimen.pop() # Remove the last element with pop method lmao
         lower_image_path = specimen[-1]
         lower_image = load_scan([entry.path for entry in os.scandir(lower_image_path) if entry.is_file()][-1])
-        
+
         z_shift = z_shift + int(sys.argv[2]) # z_shift depends on magnification: 5x: 1650, 2x: 820; multiply these values for further z-stages
         # Registration
         final_transform = four_step_registration(lower_image, upper_image, z_shift)
@@ -438,15 +438,15 @@ for specimen in specimens:
         # Update z_shift
         z_shift = final_transform.GetOffset()[2]
         print(final_transform.GetOffset())
-  
+
     #######################################################
     ########## Mask the images with segmentation ##########
     #image_clean = mask2crop(upper_image, canvas, final_transform, mask_00, mask_01)
     #print(average_image_clean.GetPixelIDTypeAsString())
     #######################################################
-        
+
     OUTPUT = sys.argv[3]+spec_name+".nii"
-        
+
     sitk.WriteImage(upper_image, OUTPUT)
     #sitk.WriteImage(image_clean, OUTPUT)
 

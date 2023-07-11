@@ -409,7 +409,7 @@ for specimen in specimens:
 
     spec_name = os.path.basename(specimen[0]).split('_')[0]
     print("Next specimen:", spec_name)
-    upper_image_path = specimen[-1]
+    upper_image_path = specimen[-1] #In antscan, the blend file comes after the abs file!
     upper_image = load_scan([entry.path for entry in os.scandir(upper_image_path) if entry.is_file()][-1])
     z_shift = 0 # initialize z-shift
 
