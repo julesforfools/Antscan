@@ -40,37 +40,6 @@ def load_scan(path):
     image.SetDirection(np.eye(3).flatten())  # Adjust direction according to your image
     return(image)
 
-def mask2mask(mask_path):
-
-    '''
-    This function reads a binary image and transforms its values to zeros and ones.
-    If the mask is already zeros and ones, then this is superfluous.
-    It is meant to be used with a tiff file.
-    It assumes the background has more pixels in the image than the foreground.
-    '''
-
-    mask = sitk.ReadImage(mask_path, sitk.sitkUInt8)
-
-    # Investigate the mask
-    mask = sitk.GetArrayFromImage(mask)
-    mask_flat = mask.flatten()
-
-    # Get the unique values and their counts
-    unique_values, counts = np.unique(mask_flat, return_counts=True)
-
-    # Sort the unique values and counts in descending order based on counts
-    sorted_indices = np.argsort(-counts)
-    unique_values_sorted = unique_values[sorted_indices]
-
-     # Check if there are exactly two unique values
-    if len(unique_values_sorted) == 2:
-        mask[mask == unique_values_sorted[0]] = 0 # Background pixels are set to zero
-        mask[mask == unique_values_sorted[1]] = 1 # Foreground pixels are set to one
-        mask = sitk.GetImageFromArray(mask)
-        return(mask)
-    else:
-        raise ValueError("Expected exactly two unique values, but found otherwise. The input does not seem to be a mask")
-
 def four_step_registration(fixed_image, moving_image, initial_z):
 
     '''
@@ -376,9 +345,6 @@ def mask2crop2(image, mask, dil_it=10):
 ############################################################################################
 ############################### Script #####################################################
 ############################################################################################
-# Start a timer
-start_time = time.time()
-
 parent_folder = sys.argv[1]
 
 folders = absolute_folder_paths(parent_folder) # get folders/specimens
@@ -406,6 +372,8 @@ print("Total number of specimens:", len(specimens))
 
 # Register, merge, crop all specimens in folder
 for specimen in specimens:
+    # Start a timer
+    start_time = time.time()
 
     spec_name = os.path.basename(specimen[0]).split('_')[0]
     print("Next specimen:", spec_name)
@@ -413,6 +381,8 @@ for specimen in specimens:
     upper_image = load_scan([entry.path for entry in os.scandir(upper_image_path) if entry.is_file()][-1])
     z_shift = 0 # initialize z-shift
 
+    #############################################
+    ########## Register & Merge Images ##########
     while(len(specimen) > 1 and type(specimen) == list): # As long as there's images left to merge
         specimen.pop() # Remove the last element with pop method lmao
         lower_image_path = specimen[-1]
@@ -426,12 +396,13 @@ for specimen in specimens:
         # Update z_shift
         z_shift = final_transform.GetOffset()[2]
         print(final_transform.GetOffset())
+    #############################################
 
     #######################################################
     ########## Mask the images with segmentation ##########
     sitk.WriteImage(upper_image, sys.argv[3]+"intermediary_result.nii") # Temporarily store results
 
-    os.system('python C:/Users/Julian/git/biomedisa/demo/biomedisa_deeplearning.py -p {} G:/3d_workdir/ant_sf/6_antscan_dnn/antscan.h5'.format(sys.argv[3]+"intermediary_result.nii"))
+    os.system('python3 /apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa/demo/biomedisa_deeplearning.py -p {} antscan.h5'.format(sys.argv[3]+"intermediary_result.nii"))
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
     print(mask.GetSize())
     image_clean = mask2crop2(upper_image, mask)
@@ -441,11 +412,9 @@ for specimen in specimens:
     OUTPUT = sys.argv[3]+spec_name+".nii"
     sitk.WriteImage(image_clean, OUTPUT)
 
-
-
-# End the timer
-end_time = time.time()
-# Calculate the execution time in seconds
-execution_time = end_time - start_time
-# Print the execution time
-print("\nExecution time:", execution_time, "seconds")
+    # End the timer
+    end_time = time.time()
+    # Calculate the execution time in seconds
+    execution_time = end_time - start_time
+    # Print the execution time
+    print("\nExecution time:", execution_time, "seconds")
