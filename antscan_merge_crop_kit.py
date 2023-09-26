@@ -2,7 +2,7 @@
 """
 Created on Thu May 18 15:19:07 2023
 
-@author: Julian Katzke
+@author: Julian Katzke, Philipp D. Loesel
 """
 
 ############################################################################################
@@ -13,9 +13,9 @@ import os # for files and directories
 import sys # to simply run biomedisa
 import SimpleITK as sitk
 import numpy as np
-import scipy.ndimage
+import scipy.ndimage # to perform processes after DNN segmentation
 #import time
-import psutil
+import psutil # to monitor memory usage
 
 print(sys.argv[0:])
 #print(len(sys.argv))
@@ -28,12 +28,13 @@ print(sys.argv[0:])
 ############################################################################################
 
 def absolute_folder_paths(directory):
+    ''' Return Paths of all folders (scans) in parent folder'''
     path = os.path.abspath(directory)
     return [entry.path for entry in os.scandir(path)]
 
 def set_voxel_spacing(image_path, image):
     '''Helper Function to adjust image spacing in antscan data so users don't have to'''
-    ###!!!! SimpleITK Voxel Spacing and Voxel Size as we know are not equivalent !!!!#####
+    '''Note for Amira/Avizo Users: To apply the new spacing, 'Resample Transformed Image' with settings to 'Extended' and 'Preserve Dimensions' '''
     # Define the mapping of paths to voxel spacings
     keys = {
         "/5X/": (2.44, 2.44, 2.44),
@@ -69,8 +70,11 @@ def four_step_registration(fixed_image, moving_image, initial_z):
     this function was purely made for antscan data
     '''
 
+    #############
+    ### Setup ###
+    #############
     ### Crop out parts of the images that are unnecessary for registration
-    n_crop_remain = int((moving_image.GetSize()[2]-(initial_z))*1.10) # Choose the number of slices to remain after cropping: overlap plus ten percent
+    n_crop_remain = int((moving_image.GetSize()[2]-(initial_z))*1.05) # Choose the number of slices to remain after cropping: overlap plus five percent
     print("Remaining Images after cropping:", n_crop_remain)
     moving_image = moving_image[:, :, -n_crop_remain:] # Crop sitk image by slicing, note the minus to indicate that we want the last images for the upper part
     print(moving_image.GetSize())
@@ -90,9 +94,9 @@ def four_step_registration(fixed_image, moving_image, initial_z):
     translation.SetParameters((0.0, 0.0, float(initial_z)))
     print("Initial Parameters: " + str(translation.GetOffset()))
 
-    ###############################
-    ### Three-Step registration ###
-    ###############################
+    ##############################
+    ### Four-Step registration ###
+    ##############################
     ### Round 1: Exhaustive Registration on 16-times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
 
@@ -243,10 +247,10 @@ def merge_ct(lower_part, upper_part, transform):
 
     dimension = 3
 
-    # Get the size of the fixed image
+    # Get the size of the lower image
     size = lower_part.GetSize()
 
-    # Compute the required size of the resampled image
+    # Compute the required size of the final image
     transformed_moving_size = [int((size[i] - 1) + abs(transform.GetOffset()[i])) + 1 for i in range(3)]
     print("Target Size", transformed_moving_size)
     transformed_moving_size.reverse() # Reverse for numpy array order of dimensions
@@ -312,23 +316,24 @@ def mask2crop2(image, mask, dil_it=10):
     This function computes masking and cropping of the averaged image
     This is a new version of the function to simply take in a file and a corresponding segmentation.
     Included here is a largest island selection to filter some noise in the segmentation.
-    To dilate the result in case hairs or something were not included in the original mask, we set and additional argument of dilation iterations
+    To dilate the result more, we set the argument of dilation iterations.
     '''
 
     mask = sitk.GetArrayFromImage(mask)
-    # Dilate first to capture small details like legs and feet
+    ### Initial dilation to better connect components
     # Create a structuring element for dilation
     structuring_element = scipy.ndimage.generate_binary_structure(3, 1)
     # Define the number of iterations for dilation
     iterations = int(dil_it)
     # Perform dilation on the segmentation array
     mask = scipy.ndimage.binary_dilation(mask, structure=structuring_element, iterations=iterations)
-    # Largest islands with scipy
+    # Largest islands segmentation with scipy
     mask, num_features = scipy.ndimage.label(mask)
     component_sizes = np.bincount(mask.ravel())
     largest_component_index = np.argmax(component_sizes[1:]) + 1
     mask = (mask == largest_component_index).astype(np.uint8)
-    # Dilate again
+
+    ### Dilate again to create a buffer around the segmentation
     # Define the number of iterations for dilation
     iterations = int(dil_it*3)
     # Perform dilation on the segmentation array
@@ -384,15 +389,15 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-#specimens = specimens[:50] #Start with subset first
-# open file in write mode
+#specimens = specimens[:50] for subsetting if time is limited
+# write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
         # write each item on a new line
         fp.write("%s\n" % item)
     print('Done')
 
-# Register, merge, crop all specimens in folder
+##### Register, merge, crop all specimens in folder #####
 for specimen in specimens:
 
     spec_name = os.path.basename(specimen[0]).split('_')[0]
@@ -443,7 +448,7 @@ for specimen in specimens:
     OUTPUT = sys.argv[3]+spec_name+".nii"
     sitk.WriteImage(image_clean, OUTPUT)
 
-### Write Registration results to file
+### Write Registration results to file ###
 # open file in write mode
 with open(sys.argv[3]+"specimens_processed.txt", 'w') as fp:
     for item in specimens:
