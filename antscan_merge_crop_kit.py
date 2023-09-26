@@ -17,6 +17,17 @@ import scipy.ndimage # to perform processes after DNN segmentation
 #import time
 import psutil # to monitor memory usage
 
+
+### Setup Biomedisa
+# change this line to your biomedisa directory
+path_to_biomedisa = '/apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa'
+
+# load libraries
+sys.path.append(path_to_biomedisa)
+from biomedisa_features.biomedisa_helper import load_data, save_data
+from demo.biomedisa_deeplearning import deep_learning
+from demo.keras_helper import get_image_dimensions, get_physical_size
+
 print(sys.argv[0:])
 #print(len(sys.argv))
 #sys.argv is a list in Python, which contains the command-line arguments passed to the script.
@@ -426,17 +437,31 @@ for specimen in specimens:
     #############################################
     specimen.append(transform_data)
 
-    #######################################################
-    ########## Mask the images with segmentation ##########
+    ###########################################################################
+    #################### Mask the images with segmentation ####################
     sitk.WriteImage(main_image, sys.argv[3]+"intermediary_result.nii") # Temporarily store results
 
-    os.system('python3 /apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa/demo/biomedisa_deeplearning.py -p {} ~/antscan.h5'.format(sys.argv[3]+"intermediary_result.nii"))
+    ##################################
+    ### Biomedisa DNN Segmentation ###
+    # Old Version with os.system
+    #os.system('python3 /apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa/demo/biomedisa_deeplearning.py -p {} ~/antscan.h5'.format(sys.argv[3]+"intermediary_result.nii"))
+    # load data
+    img, img_header, img_ext = load_data(sys.argv[3]+"intermediary_result.nii",
+        return_extension=True)
+    # deep learning
+    results = deep_learning(img, predict=True, img_header=img_header,
+        path_to_model='~/antscan.h5', img_extension=img_ext)
+    # save result
+    save_data(sys.argv[3]+"final.intermediary_result.tif", results['regular'],
+        header=results['header'])
+    ##################################
+
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
     print(mask.GetSize())
     image_clean, indices = mask2crop2(main_image, mask)
     specimen.append(indices)
     print(image_clean.GetPixelIDTypeAsString())
-    #######################################################
+    ###########################################################################
 
     ####################################
     ########## Set Voxel Size ##########
