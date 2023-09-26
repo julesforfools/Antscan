@@ -18,7 +18,7 @@ import scipy.ndimage # to perform processes after DNN segmentation
 import psutil # to monitor memory usage
 
 
-### Setup Biomedisa
+### Setup Biomedisa (version 23.08.1 or higher)
 # change this line to your biomedisa directory
 path_to_biomedisa = '/apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa'
 
@@ -450,10 +450,9 @@ for specimen in specimens:
         return_extension=True)
     # deep learning
     results = deep_learning(img, predict=True, img_header=img_header,
-        path_to_model='~/antscan.h5', img_extension=img_ext)
+        path_to_model='/home/j/jkatzke/antscan.h5', img_extension=img_ext)
     # save result
-    save_data(sys.argv[3]+"final.intermediary_result.tif", results['regular'],
-        header=results['header'])
+    save_data(sys.argv[3]+"final.intermediary_result.tif", results['regular'])
     ##################################
 
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
