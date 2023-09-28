@@ -27,6 +27,7 @@ sys.path.append(path_to_biomedisa)
 from biomedisa_features.biomedisa_helper import load_data, save_data
 from demo.biomedisa_deeplearning import deep_learning
 from demo.keras_helper import get_image_dimensions, get_physical_size
+from biomedisa_features.active_contour import refinement
 
 print(sys.argv[0:])
 #print(len(sys.argv))
@@ -451,8 +452,9 @@ for specimen in specimens:
     # deep learning
     results = deep_learning(img, predict=True, img_header=img_header,
         path_to_model='/home/j/jkatzke/antscan.h5', img_extension=img_ext)
+    result_refined = refinement(img, results['regular'])
     # save result
-    save_data(sys.argv[3]+"final.intermediary_result.tif", results['regular'])
+    save_data(sys.argv[3]+"final.intermediary_result.tif", results)
     ##################################
 
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
