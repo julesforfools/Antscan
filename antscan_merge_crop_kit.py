@@ -329,6 +329,7 @@ def mask2crop2(image, mask, dil_it=10):
     This is a new version of the function to simply take in a file and a corresponding segmentation.
     Included here is a largest island selection to filter some noise in the segmentation.
     To dilate the result more, we set the argument of dilation iterations.
+    !!! Due to high number of small errors, masking removed !!!
     '''
 
     mask = sitk.GetArrayFromImage(mask)
@@ -362,7 +363,7 @@ def mask2crop2(image, mask, dil_it=10):
     ############################
     # Mask first to be relatively sure that the bright vial-air-boundary is not in the final result
     ### Errors were reported ###
-    image = (sitk.GetArrayFromImage(image))*mask
+    #image = (sitk.GetArrayFromImage(image))*mask
     ############################
     # Crop the image to the bounding box of the segmentation
     image = image[min_z:max_z+1, min_y:max_y+1, min_x:max_x+1]
