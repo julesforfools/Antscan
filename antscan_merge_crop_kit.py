@@ -453,9 +453,9 @@ for specimen in specimens:
     # deep learning
     results = deep_learning(img, predict=True, img_header=img_header,
         path_to_model='/home/j/jkatzke/antscan.h5', img_extension=img_ext)
-    result_refined = refinement(img, results['regular'])
+    results_refined = refinement(img, results['regular'])
     # save result
-    save_data(sys.argv[3]+"final.intermediary_result.tif", results)
+    save_data(sys.argv[3]+"final.intermediary_result.tif", results_refined)
     ##################################
 
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
