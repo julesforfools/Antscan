@@ -363,7 +363,7 @@ def mask2crop2(image, mask, dil_it=10):
     ############################
     # Mask first to be relatively sure that the bright vial-air-boundary is not in the final result
     ### Errors were reported ###
-    #image = (sitk.GetArrayFromImage(image))*mask
+    image = (sitk.GetArrayFromImage(image))#*mask
     ############################
     # Crop the image to the bounding box of the segmentation
     image = image[min_z:max_z+1, min_y:max_y+1, min_x:max_x+1]
@@ -402,7 +402,7 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-#specimens = specimens[:50] for subsetting if time is limited
+specimens = specimens[:300]# for subsetting if time is limited
 # write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
@@ -437,12 +437,12 @@ for specimen in specimens:
         print(final_transform.GetOffset())
         transform_data.append(final_transform.GetOffset())
     #############################################
-    specimen.append(transform_data)
+    specimen.append(transform_data) # append transform results to specimen
 
     ###########################################################################
     #################### Mask the images with segmentation ####################
     sitk.WriteImage(main_image, sys.argv[3]+"intermediary_result.nii") # Temporarily store results
-
+    #sitk.WriteImage(main_image, sys.argv[3]+spec_name+"_intermediary_result.nii") # Temporarily store results
     ##################################
     ### Biomedisa DNN Segmentation ###
     # Old Version with os.system
@@ -456,19 +456,20 @@ for specimen in specimens:
     results_refined = refinement(img, results['regular'])
     # save result
     save_data(sys.argv[3]+"final.intermediary_result.tif", results_refined)
+    #save_data(sys.argv[3]+spec_name+"_final.intermediary_result.tif", results_refined)
     ##################################
 
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
     print(mask.GetSize())
     image_clean, indices = mask2crop2(main_image, mask)
-    specimen.append(indices)
+    specimen.append(indices) #append cropping indices to specimen
     print(image_clean.GetPixelIDTypeAsString())
     ###########################################################################
 
     ####################################
     ########## Set Voxel Size ##########
     # Use the image path to feel out the voxel size and adjust using the helper function
-    image_clean = set_voxel_spacing(main_image_path, image_clean) # Doesn't work
+    image_clean = set_voxel_spacing(main_image_path, image_clean)
     print(image_clean.GetSpacing())
     ####################################
 
