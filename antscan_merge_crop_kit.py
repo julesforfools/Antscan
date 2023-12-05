@@ -87,13 +87,13 @@ def four_step_registration(fixed_image, moving_image, initial_z):
     #############
     ### Crop out parts of the images that are unnecessary for registration
     n_crop_remain = int((moving_image.GetSize()[2]-(initial_z))*1.05) # Choose the number of slices to remain after cropping: overlap plus five percent
-    print("Remaining Images after cropping:", n_crop_remain)
+    #print("Remaining Images after cropping:", n_crop_remain)
     moving_image = moving_image[:, :, -n_crop_remain:] # Crop sitk image by slicing, note the minus to indicate that we want the last images for the upper part
-    print(moving_image.GetSize())
-    print("Upper Cropped Image Origin:", moving_image.GetOrigin())
+    #print(moving_image.GetSize())
+    #print("Upper Cropped Image Origin:", moving_image.GetOrigin())
     fixed_image = fixed_image[:, :, :n_crop_remain] # Crop sitk image by slicing, note the minus to indicate that we want the last images for the upper part
-    print(fixed_image.GetSize())
-    print("Lower Cropped Image Origin:", fixed_image.GetOrigin())
+    #print(fixed_image.GetSize())
+    #print("Lower Cropped Image Origin:", fixed_image.GetOrigin())
 
     ### Cast input images to 32bit for registration
     # Convert the images to floating-point format
@@ -104,7 +104,7 @@ def four_step_registration(fixed_image, moving_image, initial_z):
     dimension = 3
     translation = sitk.TranslationTransform(dimension)
     translation.SetParameters((0.0, 0.0, float(initial_z)))
-    print("Initial Parameters: " + str(translation.GetOffset()))
+    #print("Initial Parameters: " + str(translation.GetOffset()))
 
     ##############################
     ### Four-Step registration ###
@@ -134,11 +134,11 @@ def four_step_registration(fixed_image, moving_image, initial_z):
 
     # Run the registration
     registration_method.Execute(fixed_image, moving_image)
-    print(f"Final metric value: {registration_method.GetMetricValue()}")
-    print(
-        f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
-        )
-    print("Parameters after first step: " + str(tuple(elem for elem in translation.GetOffset())))
+    #print(f"Final metric value: {registration_method.GetMetricValue()}")
+    #print(
+    #    f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
+    #    )
+    #print("Parameters after first step: " + str(tuple(elem for elem in translation.GetOffset())))
 
 
     ### Round 2: Exhaustive Registration on 16-times downsampling with a smaller spectrum ###
@@ -166,11 +166,11 @@ def four_step_registration(fixed_image, moving_image, initial_z):
 
     # Run the registration
     registration_method.Execute(fixed_image, moving_image)
-    print(f"Final metric value: {registration_method.GetMetricValue()}")
-    print(
-        f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
-        )
-    print("Parameters after second step: " + str(tuple(elem for elem in translation.GetOffset())))
+    #print(f"Final metric value: {registration_method.GetMetricValue()}")
+    #print(
+    #    f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
+    #    )
+    #print("Parameters after second step: " + str(tuple(elem for elem in translation.GetOffset())))
 
     ### Round 3: Exhaustive Registration on 8-times downsampling finer ###
     registration_method = sitk.ImageRegistrationMethod()
@@ -197,11 +197,11 @@ def four_step_registration(fixed_image, moving_image, initial_z):
 
     # Run the registration
     registration_method.Execute(fixed_image, moving_image)
-    print(f"Final metric value: {registration_method.GetMetricValue()}")
-    print(
-        f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
-        )
-    print("Parameters after third step: " + str(tuple(elem for elem in translation.GetOffset())))
+    #print(f"Final metric value: {registration_method.GetMetricValue()}")
+    #print(
+    #    f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
+    #    )
+    #print("Parameters after third step: " + str(tuple(elem for elem in translation.GetOffset())))
 
     ### Round 4: Final step with Gradient Descent optimizer on 8,4,2 times downsampling ###
     registration_method = sitk.ImageRegistrationMethod()
@@ -233,13 +233,13 @@ def four_step_registration(fixed_image, moving_image, initial_z):
 
     # Run the registration
     registration_method.Execute(fixed_image, moving_image)
-    print(f"Final metric value: {registration_method.GetMetricValue()}")
-    print(
-        f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
-        )
-    print("Parameters after last step: " + str(tuple(elem for elem in translation.GetOffset())))
+    #print(f"Final metric value: {registration_method.GetMetricValue()}")
+    #print(
+    #    f"Optimizer's stopping condition, {registration_method.GetOptimizerStopConditionDescription()}"
+    #    )
+    #print("Parameters after last step: " + str(tuple(elem for elem in translation.GetOffset())))
 
-    ### Scale Translation Up to apply to images
+    ### Get values to apply to images
     translation.SetParameters((
         translation.GetOffset()[0],
         translation.GetOffset()[1],
@@ -264,16 +264,16 @@ def merge_ct(lower_part, upper_part, transform):
 
     # Compute the required size of the final image
     transformed_moving_size = [int((size[i] - 1) + abs(transform.GetOffset()[i])) + 1 for i in range(3)]
-    print("Target Size", transformed_moving_size)
+    #print("Target Size", transformed_moving_size)
     transformed_moving_size.reverse() # Reverse for numpy array order of dimensions
     canvas = np.zeros(transformed_moving_size, dtype=np.uint8)
     canvas = sitk.GetImageFromArray(canvas)
     #print("Numpy Array Shape",canvas_np.shape) # removed for memory
-    print("ITK Canvas Size", canvas.GetSize())
+    #print("ITK Canvas Size", canvas.GetSize())
 
     n_overlap = upper_part.GetSize()[2]+lower_part.GetSize()[2]-canvas.GetSize()[2] #Calculate overlapping region
     end_upper_part = (upper_part.GetSize()[2])-1 #Save the number of slices in the upper image as an index of the beginning of the overlap
-    print("\n The overlapping slices total ", n_overlap, "and the index for the last overlapping slice is", end_upper_part)
+    #print("\n The overlapping slices total ", n_overlap, "and the index for the last overlapping slice is", end_upper_part)
 
     # Resample the images statically onto the new merged size
     # The upper part first
@@ -315,8 +315,8 @@ def merge_ct(lower_part, upper_part, transform):
     print("Peak Memory usage in Merging step:", memory_usage, "GB")
     ###
 
-    print("New Merged Image Size:", merged_image.GetSize())
-    print("Pixel Type:", merged_image.GetPixelIDTypeAsString())
+    #print("New Merged Image Size:", merged_image.GetSize())
+    #print("Pixel Type:", merged_image.GetPixelIDTypeAsString())
     print("Merging Images Done!\n")
 
     return(merged_image)
@@ -338,8 +338,22 @@ def mask2crop2(image, mask, dil_it=10):
     structuring_element = scipy.ndimage.generate_binary_structure(3, 1)
     # Define the number of iterations for dilation
     iterations = int(dil_it)
+
+    ### Print Memory usage
+    # Get the current process ID
+    pid = psutil.Process()
+    # Get the memory usage in bytes
+    memory_usage = (pid.memory_info().rss) / (1024 * 1024 * 1024)
+    # Print the memory usage in gigabytes
+    print("Memory usage before dilating segmentation:", memory_usage, "GB")
+    ###
+
     # Perform dilation on the segmentation array
     mask = scipy.ndimage.binary_dilation(mask, structure=structuring_element, iterations=iterations)
+
+    print(locals())
+    print(globals())
+
     # Largest islands segmentation with scipy
     mask, num_features = scipy.ndimage.label(mask)
     component_sizes = np.bincount(mask.ravel())
@@ -359,7 +373,7 @@ def mask2crop2(image, mask, dil_it=10):
     min_z, min_y, min_x = np.min(nonzero_indices, axis=1)
     max_z, max_y, max_x = np.max(nonzero_indices, axis=1)
     ### Apply
-    print("Image size before:", image.GetSize())
+    #print("Image size before:", image.GetSize())
     ############################
     # Mask first to be relatively sure that the bright vial-air-boundary is not in the final result
     ### Errors were reported ###
@@ -369,7 +383,7 @@ def mask2crop2(image, mask, dil_it=10):
     image = image[min_z:max_z+1, min_y:max_y+1, min_x:max_x+1]
     # Convert back to sitk
     image = sitk.GetImageFromArray(image)
-    print("Image size after:", image.GetSize())
+    #print("Image size after:", image.GetSize())
 
     return(image, [min_x, max_x, min_y, max_y, min_z, max_z])
 
@@ -402,7 +416,7 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-specimens = specimens[:300]# for subsetting if time is limited
+specimens = specimens[63:200]# for subsetting if time is limited
 # write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
@@ -414,7 +428,7 @@ with open(sys.argv[3]+"specimens.txt", 'w') as fp:
 for specimen in specimens:
 
     spec_name = os.path.basename(specimen[0]).split('_')[0]
-    print("Next specimen:", spec_name)
+    print("\n\n Next specimen:", spec_name)
     main_image_path = specimen[-1] #In antscan, the blend file comes after the abs file!
     main_image = load_scan([entry.path for entry in os.scandir(main_image_path) if entry.is_file()][-1])
     z_shift = 0 # initialize z-shift
@@ -432,6 +446,7 @@ for specimen in specimens:
         final_transform = four_step_registration(lower_image, main_image, z_shift)
         # Merge
         main_image = merge_ct(lower_image, main_image, final_transform) # Keep item as upper_image for while loop
+        lower_image = none #deallocate object to save memory
         # Update z_shift
         z_shift = final_transform.GetOffset()[2]
         print(final_transform.GetOffset())
@@ -442,6 +457,7 @@ for specimen in specimens:
     ###########################################################################
     #################### Mask the images with segmentation ####################
     sitk.WriteImage(main_image, sys.argv[3]+"intermediary_result.nii") # Temporarily store results
+    main_image = none #deallocate object to save memory
     #sitk.WriteImage(main_image, sys.argv[3]+spec_name+"_intermediary_result.nii") # Temporarily store results
     ##################################
     ### Biomedisa DNN Segmentation ###
@@ -460,17 +476,27 @@ for specimen in specimens:
     ##################################
 
     mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
-    print(mask.GetSize())
+    #print(mask.GetSize())
+
+    ### Print Memory usage
+    # Get the current process ID
+    pid = psutil.Process()
+    # Get the memory usage in bytes
+    memory_usage = (pid.memory_info().rss) / (1024 * 1024 * 1024)
+    # Print the memory usage in gigabytes
+    print("Memory usage before Masking step:", memory_usage, "GB")
+    ###
+
     image_clean, indices = mask2crop2(main_image, mask)
     specimen.append(indices) #append cropping indices to specimen
-    print(image_clean.GetPixelIDTypeAsString())
+    #print(image_clean.GetPixelIDTypeAsString())
     ###########################################################################
 
     ####################################
     ########## Set Voxel Size ##########
     # Use the image path to feel out the voxel size and adjust using the helper function
     image_clean = set_voxel_spacing(main_image_path, image_clean)
-    print(image_clean.GetSpacing())
+    #print(image_clean.GetSpacing())
     ####################################
 
     OUTPUT = sys.argv[3]+spec_name+".nii"
