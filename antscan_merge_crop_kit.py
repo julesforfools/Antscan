@@ -20,8 +20,8 @@ import psutil # to monitor memory usage
 
 ### Setup Biomedisa (version 23.08.1 or higher)
 # change this line to your biomedisa directory
-path_to_biomedisa = '/apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa'
-
+#path_to_biomedisa = '/apps/unit/EconomoU/biomedisa_dnn/bin/git/biomedisa'
+path_to_biomedisa = sys.argv[5]
 # load libraries
 sys.path.append(path_to_biomedisa)
 from biomedisa_features.biomedisa_helper import load_data, save_data
@@ -32,8 +32,8 @@ from biomedisa_features.active_contour import refinement
 print(sys.argv[0:])
 #print(len(sys.argv))
 #sys.argv is a list in Python, which contains the command-line arguments passed to the script.
-#sys.argv[0] is the directory, sys.argv[1] is the script, etc..
-
+#sys.argv[0] is the script, sys.argv[1] is the source file directory, sys.argv[2] is the z-Shift, sys.argv[3] is the destination file directory,
+#sys.argv[4] is the location of the .h5 DNN
 
 ############################################################################################
 ############################### Functions ##################################################
@@ -332,7 +332,7 @@ def mask2crop2(image, mask, dil_it=10):
     !!! Due to high number of small errors, masking removed !!!
     '''
 
-    mask = sitk.GetArrayFromImage(mask)
+    #mask = sitk.GetArrayFromImage(mask) #Deprecated as biomedisa stores mask as Numpy Array
     ### Initial dilation to better connect components
     # Create a structuring element for dilation
     structuring_element = scipy.ndimage.generate_binary_structure(3, 1)
@@ -350,9 +350,6 @@ def mask2crop2(image, mask, dil_it=10):
 
     # Perform dilation on the segmentation array
     mask = scipy.ndimage.binary_dilation(mask, structure=structuring_element, iterations=iterations)
-
-    print(locals())
-    print(globals())
 
     # Largest islands segmentation with scipy
     mask, num_features = scipy.ndimage.label(mask)
@@ -416,7 +413,7 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-specimens = specimens[63:200]# for subsetting if time is limited
+specimens = specimens[:50]# for subsetting if time is limited
 # write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
@@ -445,8 +442,8 @@ for specimen in specimens:
         # Registration
         final_transform = four_step_registration(lower_image, main_image, z_shift)
         # Merge
-        main_image = merge_ct(lower_image, main_image, final_transform) # Keep item as upper_image for while loop
-        lower_image = none #deallocate object to save memory
+        main_image = merge_ct(lower_image, main_image, final_transform) # Keep item as main_image for while loop
+        del lower_image #deallocate object to save memory
         # Update z_shift
         z_shift = final_transform.GetOffset()[2]
         print(final_transform.GetOffset())
@@ -457,7 +454,6 @@ for specimen in specimens:
     ###########################################################################
     #################### Mask the images with segmentation ####################
     sitk.WriteImage(main_image, sys.argv[3]+"intermediary_result.nii") # Temporarily store results
-    main_image = none #deallocate object to save memory
     #sitk.WriteImage(main_image, sys.argv[3]+spec_name+"_intermediary_result.nii") # Temporarily store results
     ##################################
     ### Biomedisa DNN Segmentation ###
@@ -468,15 +464,12 @@ for specimen in specimens:
         return_extension=True)
     # deep learning
     results = deep_learning(img, predict=True, img_header=img_header,
-        path_to_model='/home/j/jkatzke/antscan.h5', img_extension=img_ext)
-    results_refined = refinement(img, results['regular'])
-    # save result
-    save_data(sys.argv[3]+"final.intermediary_result.tif", results_refined)
-    #save_data(sys.argv[3]+spec_name+"_final.intermediary_result.tif", results_refined)
+        #path_to_model='/home/j/jkatzke/antscan.h5', img_extension=img_ext)
+        path_to_model=sys.argv[4], img_extension=img_ext)
+    mask = refinement(img, results['regular'])
+    del results #deallocate object to save memory
+    print("results_refined:", type(mask))
     ##################################
-
-    mask = sitk.ReadImage(sys.argv[3]+"final.intermediary_result.tif", sitk.sitkUInt8)
-    #print(mask.GetSize())
 
     ### Print Memory usage
     # Get the current process ID
@@ -487,7 +480,8 @@ for specimen in specimens:
     print("Memory usage before Masking step:", memory_usage, "GB")
     ###
 
-    image_clean, indices = mask2crop2(main_image, mask)
+    ### Apply mask ###
+    main_image, indices = mask2crop2(main_image, mask)
     specimen.append(indices) #append cropping indices to specimen
     #print(image_clean.GetPixelIDTypeAsString())
     ###########################################################################
@@ -495,12 +489,12 @@ for specimen in specimens:
     ####################################
     ########## Set Voxel Size ##########
     # Use the image path to feel out the voxel size and adjust using the helper function
-    image_clean = set_voxel_spacing(main_image_path, image_clean)
-    #print(image_clean.GetSpacing())
+    main_image = set_voxel_spacing(main_image_path, main_image)
+    print(main_image.GetSpacing())
     ####################################
 
     OUTPUT = sys.argv[3]+spec_name+".nii"
-    sitk.WriteImage(image_clean, OUTPUT)
+    sitk.WriteImage(main_image, OUTPUT)
 
 ### Write Registration results to file ###
 # open file in write mode
