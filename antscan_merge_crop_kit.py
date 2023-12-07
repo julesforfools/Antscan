@@ -317,7 +317,7 @@ def merge_ct(lower_part, upper_part, transform):
 
     #print("New Merged Image Size:", merged_image.GetSize())
     #print("Pixel Type:", merged_image.GetPixelIDTypeAsString())
-    print("Merging Images Done!\n")
+    print("Merging Images Done!")
 
     return(merged_image)
 
@@ -413,7 +413,7 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-specimens = specimens[:50]# for subsetting if time is limited
+specimens = specimens[50:100]# for subsetting if time is limited
 # write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
@@ -468,7 +468,7 @@ for specimen in specimens:
         path_to_model=sys.argv[4], img_extension=img_ext)
     mask = refinement(img, results['regular'])
     del results #deallocate object to save memory
-    print("results_refined:", type(mask))
+    #print("results_refined:", type(mask))
     ##################################
 
     ### Print Memory usage
