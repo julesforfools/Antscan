@@ -392,7 +392,7 @@ def mask2crop2(image, mask, dil_it=10):
 parent_folder = sys.argv[1]
 
 folders = absolute_folder_paths(parent_folder) # get folders/specimens
-folders = sorted(folders)
+folders = sorted(folders) # sort folders alphabetically!
 print("Total number of folders:", len(folders))
 
 specimens = []
@@ -413,7 +413,7 @@ for path in folders:
         specimens.append([path])
 
 print("Total number of specimens:", len(specimens))
-specimens = specimens[50:100]# for subsetting if time is limited
+specimens = specimens[100:300]# for subsetting if time is limited
 # write out specimens to file
 with open(sys.argv[3]+"specimens.txt", 'w') as fp:
     for item in specimens:
@@ -421,13 +421,15 @@ with open(sys.argv[3]+"specimens.txt", 'w') as fp:
         fp.write("%s\n" % item)
     print('Done')
 
-##### Register, merge, crop all specimens in folder #####
+#############################################################################################
+#################### Register, merge, crop all specimens in folder ##########################
+#############################################################################################
 for specimen in specimens:
 
     spec_name = os.path.basename(specimen[0]).split('_')[0]
     print("\n\n Next specimen:", spec_name)
-    main_image_path = specimen[-1] #In antscan, the blend file comes after the abs file!
-    main_image = load_scan([entry.path for entry in os.scandir(main_image_path) if entry.is_file()][-1])
+    main_image_path = specimen[-1] # The highest z-Stage is the 0,0,0 origin
+    main_image = load_scan([entry.path for entry in os.scandir(main_image_path) if entry.is_file()][-1]) # In antscan, the blend file comes after the abs file!
     z_shift = 0 # initialize z-shift
 
     #############################################
