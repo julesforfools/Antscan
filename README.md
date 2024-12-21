@@ -1,4 +1,4 @@
-# Antscan, hello
+# Antscan
 A collection of scripts, programs, and resources to recreate and perform the post-processing of Antscan data.
 Post-processing was undertaken to aid in dataset optimization and visualization, including:
 - Merging scans of specimens imaged in several height steps
@@ -7,6 +7,9 @@ Post-processing was undertaken to aid in dataset optimization and visualization,
 - 2D-image series generation
 - Downsampled 2D-image series generation
 - Automated mesh-to-image rendering
+
+Access to DNN for segmentations prior to public access:
+https://filesender2.oist.jp/filesender/?s=download&token=43c079c7-2e9d-4cfc-975e-11db53bb623d
 
 ## Test Data
 The test_data folder emulates the file/folder structure on which postprocessing was executed.
