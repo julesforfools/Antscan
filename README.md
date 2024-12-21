@@ -72,3 +72,17 @@ Runtime of script on Testdata: 2 seconds (Intel(R) Xeon(R) W-2145 CPU @ 3.70GHz,
 
 Files generated:
 - 16-02_lowres folder (no files generated as testing image (202x202 px) already below downsampling threshold (400x400 px))
+
+## Installation
+- Follow the installation guides of Biomedisa (tested with v24.7.1) with Deep Learning features, see: https://github.com/biomedisa/
+- Installation of Biomedisa will automatically give access to other dependencies used outside of Biomedisa, i.e. tifffile, skimage, scipy, SimpleITK, numpy.
+- Version requirements are identical to Biomedisa
+- Install time several minutes, mostly depending on the installation of CUDA for Biomedisa
+
+### System Requirements
+- Linux and Windows have been tested
+- CUDA (Nvidia Graphics Card)
+- Limitations mostly in RAM, necessary memory roughly 6 times the scans sizes
+
+  
+
