@@ -47,7 +47,7 @@ Files generated:
 - specimens_STLPNG.txt (STL metadata)
 
 ## Render Images of STL Meshes 
-General usage:  
+General usage:
 `nohup python3 -u antscan_screenshots_main_v4.py <path-to-processed-folder> &> <log-filename>.log &`  
 Note: Requires presence of 'antscan_paraview_screenshot_v3.py' in folder
 
