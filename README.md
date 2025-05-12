@@ -8,11 +8,10 @@ Post-processing was undertaken to aid in dataset optimization and visualization,
 - Downsampled 2D-image series generation
 - Automated mesh-to-image rendering
 
-<<<<<<< HEAD
-=======
-Access to DNN for segmentations prior to public access:
-https://filesender2.oist.jp/filesender/?s=download&token=43c079c7-2e9d-4cfc-975e-11db53bb623d
->>>>>>> 2ec6294f3c2bad1c912c83ea90ae4b2f577f3766
+Access to DNN for segmentations:
+https://dx.doi.org/10.35097/163wd8uzky1vh1bp  
+OR
+see Antscan on: https://biomedisa.info/gallery/
 
 ## Test Data
 The test_data folder emulates the file/folder structure on which postprocessing was executed.
@@ -38,18 +37,16 @@ Files generated:
 General usage:
 `nohup python3 -u antscan_make_biomedisa_STL_PNG.py <path-to-processed-folder> &> <log-filename>.log &`
 
-Test data usage (example folder structure Windows):
-<<<<<<< HEAD
+Test data usage (example folder structure Windows):  
 python antscan_make_biomedisa_STL_PNG.py C:/Users/Julian/git/Antscan/test_data/processed/5x/ G:/3d_workdir/ant_sf/6_antscan_dnn/antscan_2024-08-15_b_augment.h5
 Note : cd into directory with antscan_make_biomedisa_STL_PNG.py first
 Note : replace folder names when recreating
 Runtime of script on Testdata: 32 seconds (Intel(R) Xeon(R) W-2145 CPU @ 3.70GHz, 128 GB RAM, Nvidia Quadro RTX 6000)
-=======
+
 `python antscan_make_biomedisa_STL_PNG.py C:/Users/Julian/git/Antscan/test_data/processed/5x/ G:/3d_workdir/ant_sf/6_antscan_dnn/antscan_2024-08-15_b_augment.h5`  
 Note : cd into directory with antscan_make_biomedisa_STL_PNG.py first  
 Note : replace folder names when recreating  
 Runtime of script on Testdata: 32 seconds (Intel(R) Xeon(R) W-2145 CPU @ 3.70GHz, 128 GB RAM, Nvidia Quadro RTX 6000)  
->>>>>>> 2ec6294f3c2bad1c912c83ea90ae4b2f577f3766
 
 Files generated:
 - 16-02 folder (2D image series)
@@ -81,12 +78,7 @@ Note : replace folder names when recreating
 Runtime of script on Testdata: 2 seconds (Intel(R) Xeon(R) W-2145 CPU @ 3.70GHz, 128 GB RAM, Nvidia Quadro RTX 6000)  
 
 Files generated:
-<<<<<<< HEAD
 - 16-02_lowres folder (no files generated as testing image (202x202 px) already below downsampling threshold (400x400 px))
-
-
-=======
-- 16-02_lowres folder (no files generated as testing image (202x202 px) already below downsampling threshold (400x400 px))  
 
 ## Installation
 - Follow the installation guides of Biomedisa (tested with v24.7.1) with Deep Learning features, see: https://github.com/biomedisa/
@@ -111,5 +103,3 @@ We deposit one R script to read in and update Antscan metadata based on taxonomi
 - download metadata file from https://www.antscan.info
 - adjust paths in lines 14 and 16
 - If API use times out, adjust number in line 8
-
->>>>>>> 2ec6294f3c2bad1c912c83ea90ae4b2f577f3766
